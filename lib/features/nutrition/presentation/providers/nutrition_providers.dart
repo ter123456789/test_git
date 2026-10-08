@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 
 import '../../../../core/providers/shared_preferences_provider.dart';
 import '../../../../core/utils/thai_date.dart';
+import '../../../profile/presentation/providers/profile_providers.dart';
 import '../../data/datasources/ingredient_matcher.dart';
 import '../../data/datasources/nutrition_local_data_source.dart';
 import '../../data/datasources/usda_remote_data_source.dart';
@@ -10,10 +11,12 @@ import '../../data/repositories/food_log_repository_impl.dart';
 import '../../data/repositories/ingredient_repository_impl.dart';
 import '../../domain/entities/food_entry.dart';
 import '../../domain/entities/ingredient.dart';
+import '../../domain/entities/meal.dart';
 import '../../domain/entities/nutrients.dart';
 import '../../domain/entities/remote_search_result.dart';
 import '../../domain/repositories/food_log_repository.dart';
 import '../../domain/repositories/ingredient_repository.dart';
+import '../widgets/macro_targets.dart';
 
 final _nutritionLocalDataSourceProvider = Provider(
   (ref) => NutritionLocalDataSource(ref.watch(sharedPreferencesProvider)),
@@ -192,7 +195,13 @@ class FoodLogNotifier extends AsyncNotifier<List<FoodEntry>> {
       ref.watch(foodLogRepositoryProvider).getAll();
 
   /// เพิ่มรายการ ถ้าระบุ [day] (บันทึกย้อนหลัง) จะใช้เวลาปัจจุบันของวันนั้น
-  Future<void> add(Ingredient ingredient, double grams, {DateTime? day}) async {
+  /// ถ้าไม่ระบุ [meal] จะเดาจากเวลา
+  Future<void> add(
+    Ingredient ingredient,
+    double grams, {
+    DateTime? day,
+    Meal? meal,
+  }) async {
     final now = DateTime.now();
     final eatenAt = day == null || day.isSameDay(now)
         ? now
@@ -202,6 +211,7 @@ class FoodLogNotifier extends AsyncNotifier<List<FoodEntry>> {
       ingredient: ingredient,
       grams: grams,
       eatenAt: eatenAt,
+      meal: meal,
     );
     await ref.read(foodLogRepositoryProvider).add(entry);
     state = AsyncData([...?state.value, entry]);
@@ -212,3 +222,9 @@ class FoodLogNotifier extends AsyncNotifier<List<FoodEntry>> {
     state = AsyncData([...?state.value?.where((e) => e.id != id)]);
   }
 }
+
+/// เป้าสารอาหารทั้งวัน null ถ้ายังไม่มีข้อมูลส่วนตัว
+final dayTargetProvider = Provider<Nutrients?>((ref) {
+  final tdee = ref.watch(energyNeedsProvider)?.tdee;
+  return tdee == null ? null : macroTargetsFor(tdee);
+});

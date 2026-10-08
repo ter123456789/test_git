@@ -1,5 +1,6 @@
 import '../../domain/entities/food_entry.dart';
 import '../../domain/entities/ingredient.dart';
+import '../../domain/entities/meal.dart';
 import '../../domain/entities/nutrients.dart';
 
 /// แปลง entity ของ nutrition กับ JSON ที่เก็บในเครื่อง
@@ -48,6 +49,7 @@ abstract final class NutritionModels {
     'ingredient': ingredientToJson(e.ingredient),
     'grams': e.grams,
     'eatenAt': e.eatenAt.toIso8601String(),
+    'meal': e.meal.name,
   };
 
   static FoodEntry entryFromJson(Map<String, dynamic> json) => FoodEntry(
@@ -55,5 +57,7 @@ abstract final class NutritionModels {
     ingredient: ingredientFromJson(json['ingredient'] as Map<String, dynamic>),
     grams: (json['grams'] as num).toDouble(),
     eatenAt: DateTime.parse(json['eatenAt'] as String),
+    // ข้อมูลก่อนมีมื้อ (หรือชื่อมื้อที่ไม่รู้จัก) ให้เดาจากเวลาแทน
+    meal: Meal.values.asNameMap()[json['meal']],
   );
 }

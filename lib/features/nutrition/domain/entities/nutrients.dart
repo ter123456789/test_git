@@ -22,6 +22,8 @@ class Nutrients extends Equatable {
     fatG: fatG + other.fatG,
   );
 
+  Nutrients operator -(Nutrients other) => this + other.scale(-1);
+
   Nutrients scale(double factor) => Nutrients(
     kcal: kcal * factor,
     proteinG: proteinG * factor,

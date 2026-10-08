@@ -11,12 +11,13 @@ import '../../domain/entities/food_log_stats.dart';
 import '../../domain/entities/nutrients.dart';
 import '../providers/nutrition_providers.dart';
 import '../widgets/energy_ring_card.dart';
-import '../widgets/food_entry_tile.dart';
 import '../widgets/kcal_bar_chart.dart';
 import '../widgets/macro_targets.dart';
 import '../widgets/macro_tile.dart';
+import '../widgets/meal_section.dart';
 import 'add_food_page.dart';
 import 'history_page.dart';
+import 'meal_page.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -129,12 +130,18 @@ class HomePage extends ConsumerWidget {
             log.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Text('โหลดข้อมูลไม่สำเร็จ: $e'),
-              data: (_) => FoodEntryList(
-                entries: entries.reversed.toList(),
+              data: (_) => MealSectionList(
+                entries: entries,
+                dayTarget: ref.watch(dayTargetProvider),
                 emptyText:
                     'ยังไม่มีรายการ\nกด "เพิ่มวัตถุดิบ" เพื่อเริ่มบันทึก',
                 onDelete: (e) =>
                     ref.read(foodLogProvider.notifier).remove(e.id),
+                onOpen: (meal) => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => MealPage(day: today, meal: meal),
+                  ),
+                ),
               ),
             ),
           ],

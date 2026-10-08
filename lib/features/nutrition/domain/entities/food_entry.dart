@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import 'ingredient.dart';
+import 'meal.dart';
 import 'nutrients.dart';
 
 /// วัตถุดิบหนึ่งรายการที่ user กินไป
@@ -13,7 +14,8 @@ class FoodEntry extends Equatable {
     required this.ingredient,
     required this.grams,
     required this.eatenAt,
-  }) {
+    Meal? meal,
+  }) : meal = meal ?? Meal.fromTime(eatenAt) {
     if (grams <= 0) {
       throw ArgumentError.value(grams, 'grams', 'must be greater than 0');
     }
@@ -24,8 +26,11 @@ class FoodEntry extends Equatable {
   final double grams;
   final DateTime eatenAt;
 
+  /// มื้อที่ user เลือก ถ้าไม่ระบุจะเดาจากเวลาที่กิน
+  final Meal meal;
+
   Nutrients get nutrients => ingredient.nutrientsFor(grams);
 
   @override
-  List<Object?> get props => [id, ingredient, grams, eatenAt];
+  List<Object?> get props => [id, ingredient, grams, eatenAt, meal];
 }

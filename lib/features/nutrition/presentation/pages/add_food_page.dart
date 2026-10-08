@@ -1,26 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/thai_date.dart';
 import '../../../../core/utils/thai_text.dart';
 import '../../../../core/widgets/number_field.dart';
+import '../../domain/entities/food_entry.dart';
+import '../../domain/entities/food_log_stats.dart';
 import '../../domain/entities/ingredient.dart';
+import '../../domain/entities/meal.dart';
 import '../../domain/entities/remote_search_result.dart';
+import '../../domain/usecases/meal_balance.dart';
 import '../providers/nutrition_providers.dart';
 import 'custom_ingredient_page.dart';
 
-class AddFoodPage extends ConsumerWidget {
-  const AddFoodPage({super.key, this.day});
+class AddFoodPage extends ConsumerStatefulWidget {
+  const AddFoodPage({super.key, this.day, this.meal});
 
   /// วันที่จะบันทึก ถ้าเป็น null คือวันนี้
   final DateTime? day;
 
+  /// มื้อเริ่มต้น ถ้าเป็น null จะเดาจากเวลาตอนนี้
+  final Meal? meal;
+
+  @override
+  ConsumerState<AddFoodPage> createState() => _AddFoodPageState();
+}
+
+class _AddFoodPageState extends ConsumerState<AddFoodPage> {
+  late Meal _meal = widget.meal ?? Meal.fromTime(DateTime.now());
+
+  DateTime? get day => widget.day;
+
   /// [suggestedName] ใช้กับผลจาก USDA: ให้ตั้งชื่อไทยก่อนเก็บลงเครื่อง
-  Future<void> _pick(
-    BuildContext context,
-    WidgetRef ref,
-    Ingredient ingredient, {
-    String? suggestedName,
-  }) async {
+  Future<void> _pick(Ingredient ingredient, {String? suggestedName}) async {
     final result = await showDialog<_PickResult>(
       context: context,
       builder: (_) =>
@@ -32,12 +45,14 @@ class AddFoodPage extends ConsumerWidget {
     if (ingredient.source == IngredientSource.usda) {
       await ref.read(ingredientsProvider.notifier).save(ingredient);
     }
-    await ref.read(foodLogProvider.notifier).add(ingredient, grams, day: day);
-    if (context.mounted) Navigator.of(context).pop();
+    await ref
+        .read(foodLogProvider.notifier)
+        .add(ingredient, grams, day: day, meal: _meal);
+    if (mounted) Navigator.of(context).pop();
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final query = ref.watch(ingredientQueryProvider).trim();
     final local = ref.watch(filteredIngredientsProvider);
     final usda = ref.watch(usdaSearchProvider);
@@ -55,7 +70,7 @@ class AddFoodPage extends ConsumerWidget {
             onPressed: () async {
               final logged = await Navigator.of(context).push<bool>(
                 MaterialPageRoute(
-                  builder: (_) => CustomIngredientPage(day: day),
+                  builder: (_) => CustomIngredientPage(day: day, meal: _meal),
                 ),
               );
               // บันทึกเข้ารายการแล้ว ไม่ต้องอยู่หน้าเลือกวัตถุดิบต่อ
@@ -68,8 +83,13 @@ class AddFoodPage extends ConsumerWidget {
       ),
       body: Column(
         children: [
+          _MealPicker(
+            selected: _meal,
+            onChanged: (meal) => setState(() => _meal = meal),
+          ),
+          _MealGapBanner(day: day ?? DateTime.now(), meal: _meal),
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: TextField(
               decoration: const InputDecoration(
                 hintText: 'ค้นหาวัตถุดิบ (ไทยหรืออังกฤษ)',
@@ -100,7 +120,7 @@ class AddFoodPage extends ConsumerWidget {
                           for (final item in items)
                             _IngredientTile(
                               ingredient: item,
-                              onTap: () => _pick(context, ref, item),
+                              onTap: () => _pick(item),
                             ),
                         ],
                 ),
@@ -164,8 +184,6 @@ class AddFoodPage extends ConsumerWidget {
                             _IngredientTile(
                               ingredient: item,
                               onTap: () => _pick(
-                                context,
-                                ref,
                                 item,
                                 // คำค้นภาษาไทยมักเป็นชื่อที่ user อยากเห็นอยู่แล้ว
                                 suggestedName: ThaiText.hasThai(query)
@@ -193,6 +211,69 @@ class AddFoodPage extends ConsumerWidget {
       'เชื่อมต่อ USDA ไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่',
     _ => 'ค้นหาไม่สำเร็จ: $error',
   };
+}
+
+class _MealPicker extends StatelessWidget {
+  const _MealPicker({required this.selected, required this.onChanged});
+
+  final Meal selected;
+  final ValueChanged<Meal> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+      child: Row(
+        children: [
+          for (final meal in Meal.values)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Text(meal.label),
+                selected: meal == selected,
+                onSelected: (_) => onChanged(meal),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// บอกว่ามื้อที่เลือกยังขาดอะไร ระหว่างเลือกวัตถุดิบจะได้เห็นเลย
+class _MealGapBanner extends ConsumerWidget {
+  const _MealGapBanner({required this.day, required this.meal});
+
+  final DateTime day;
+  final Meal meal;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dayTarget = ref.watch(dayTargetProvider);
+    if (dayTarget == null) return const SizedBox.shrink();
+    final entries = (ref.watch(foodLogProvider).value ?? const <FoodEntry>[])
+        .entriesOn(day.dateOnly);
+    final balance = MealPlanner.balance(meal, dayTarget, entries);
+    final lacking = balance.lacking;
+    final kcalLeft = (balance.target.kcal - balance.eaten.kcal).round();
+    final text = lacking.isEmpty
+        ? (kcalLeft > 0
+              ? '${meal.label}เหลืออีก $kcalLeft kcal'
+              : '${meal.label}ครบเป้าแล้ว')
+        : '${meal.label}ยังขาด: ${lacking.map((b) => '${b.nutrient.label} '
+              '${(-b.diff).round()} ${b.nutrient.unit}').join(' · ')}';
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: lacking.isEmpty ? AppColors.soft : AppColors.lime,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Text(text, style: Theme.of(context).textTheme.bodyMedium),
+    );
+  }
 }
 
 class _IngredientTile extends StatelessWidget {

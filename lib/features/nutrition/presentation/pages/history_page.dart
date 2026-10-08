@@ -9,9 +9,10 @@ import '../../domain/entities/food_entry.dart';
 import '../../domain/entities/food_log_stats.dart';
 import '../../domain/entities/nutrients.dart';
 import '../providers/nutrition_providers.dart';
-import '../widgets/food_entry_tile.dart';
 import '../widgets/kcal_bar_chart.dart';
+import '../widgets/meal_section.dart';
 import 'add_food_page.dart';
+import 'meal_page.dart';
 
 /// ประวัติการกินย้อนหลัง: เลือกวันจากแถบสัปดาห์ ดูสรุปและรายการของวันนั้น
 class HistoryPage extends ConsumerStatefulWidget {
@@ -154,10 +155,16 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
             ],
           ),
           const SizedBox(height: 12),
-          FoodEntryList(
+          MealSectionList(
             entries: entries,
+            dayTarget: ref.watch(dayTargetProvider),
             emptyText: 'ไม่มีการบันทึกในวันนี้',
             onDelete: (e) => ref.read(foodLogProvider.notifier).remove(e.id),
+            onOpen: (meal) => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => MealPage(day: _selected, meal: meal),
+              ),
+            ),
           ),
         ],
       ),

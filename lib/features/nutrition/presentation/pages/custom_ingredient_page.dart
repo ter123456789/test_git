@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/number_field.dart';
 import '../../domain/entities/ingredient.dart';
+import '../../domain/entities/meal.dart';
 import '../../domain/entities/nutrients.dart';
 import '../../domain/entities/remote_search_result.dart';
 import '../providers/nutrition_providers.dart';
@@ -13,10 +14,13 @@ import '../providers/nutrition_providers.dart';
 ///
 /// pop กลับด้วย true เมื่อบันทึกเข้ารายการที่กินแล้ว
 class CustomIngredientPage extends ConsumerStatefulWidget {
-  const CustomIngredientPage({super.key, this.day});
+  const CustomIngredientPage({super.key, this.day, this.meal});
 
   /// วันที่จะบันทึก ถ้าเป็น null คือวันนี้
   final DateTime? day;
+
+  /// มื้อที่จะบันทึก ถ้าเป็น null จะเดาจากเวลา
+  final Meal? meal;
 
   @override
   ConsumerState<CustomIngredientPage> createState() =>
@@ -112,7 +116,12 @@ class _CustomIngredientPageState extends ConsumerState<CustomIngredientPage> {
     if (addToLog) {
       await ref
           .read(foodLogProvider.notifier)
-          .add(ingredient, double.parse(_grams.text), day: widget.day);
+          .add(
+            ingredient,
+            double.parse(_grams.text),
+            day: widget.day,
+            meal: widget.meal,
+          );
     }
     if (mounted) Navigator.of(context).pop(addToLog);
   }

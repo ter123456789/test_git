@@ -19,6 +19,12 @@ const builtinIngredients = <Ingredient>[
     per100g: Nutrients(kcal: 123, proteinG: 2.7, carbsG: 25.6, fatG: 1.0),
   ),
   Ingredient(
+    id: 'rice_sticky',
+    name: 'ข้าวเหนียว (นึ่ง)',
+    nameEn: 'glutinous rice, cooked',
+    per100g: Nutrients(kcal: 97, proteinG: 2.0, carbsG: 21.1, fatG: 0.2),
+  ),
+  Ingredient(
     id: 'rice_noodle',
     name: 'เส้นก๋วยเตี๋ยว (สุก)',
     nameEn: 'rice noodles, cooked',
@@ -43,6 +49,12 @@ const builtinIngredients = <Ingredient>[
     per100g: Nutrients(kcal: 120, proteinG: 22.5, carbsG: 0, fatG: 2.6),
   ),
   Ingredient(
+    id: 'chicken_thigh',
+    name: 'สะโพกไก่ (ไม่มีหนัง)',
+    nameEn: 'chicken thigh, meat only, raw',
+    per100g: Nutrients(kcal: 121, proteinG: 19.7, carbsG: 0, fatG: 4.1),
+  ),
+  Ingredient(
     id: 'egg',
     name: 'ไข่ไก่',
     nameEn: 'egg, whole, raw',
@@ -61,6 +73,12 @@ const builtinIngredients = <Ingredient>[
     per100g: Nutrients(kcal: 518, proteinG: 9.3, carbsG: 0, fatG: 53.0),
   ),
   Ingredient(
+    id: 'pork_ground',
+    name: 'หมูสับ',
+    nameEn: 'ground pork, raw',
+    per100g: Nutrients(kcal: 263, proteinG: 16.9, carbsG: 0, fatG: 21.2),
+  ),
+  Ingredient(
     id: 'beef_ground',
     name: 'เนื้อวัวบด (ไขมัน 15%)',
     nameEn: 'ground beef 85% lean, raw',
@@ -71,6 +89,12 @@ const builtinIngredients = <Ingredient>[
     name: 'ปลาแซลมอน',
     nameEn: 'salmon, atlantic, raw',
     per100g: Nutrients(kcal: 208, proteinG: 20.0, carbsG: 0, fatG: 13.0),
+  ),
+  Ingredient(
+    id: 'tilapia',
+    name: 'ปลานิล',
+    nameEn: 'tilapia, raw',
+    per100g: Nutrients(kcal: 96, proteinG: 20.1, carbsG: 0, fatG: 1.7),
   ),
   Ingredient(
     id: 'shrimp',
@@ -103,6 +127,12 @@ const builtinIngredients = <Ingredient>[
     per100g: Nutrients(kcal: 19, proteinG: 2.6, carbsG: 3.1, fatG: 0.2),
   ),
   Ingredient(
+    id: 'chinese_kale',
+    name: 'คะน้า (สุก)',
+    nameEn: 'chinese broccoli, cooked',
+    per100g: Nutrients(kcal: 22, proteinG: 1.1, carbsG: 3.8, fatG: 0.7),
+  ),
+  Ingredient(
     id: 'carrot',
     name: 'แครอท',
     nameEn: 'carrot, raw',
@@ -125,6 +155,12 @@ const builtinIngredients = <Ingredient>[
     name: 'แอปเปิล',
     nameEn: 'apple, raw',
     per100g: Nutrients(kcal: 52, proteinG: 0.3, carbsG: 13.8, fatG: 0.2),
+  ),
+  Ingredient(
+    id: 'guava',
+    name: 'ฝรั่ง',
+    nameEn: 'guava, raw',
+    per100g: Nutrients(kcal: 68, proteinG: 2.6, carbsG: 14.3, fatG: 1.0),
   ),
   Ingredient(
     id: 'avocado',

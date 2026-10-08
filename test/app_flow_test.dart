@@ -9,6 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test_git/app.dart';
 import 'package:test_git/core/providers/shared_preferences_provider.dart';
 import 'package:test_git/features/nutrition/presentation/pages/history_page.dart';
+import 'package:test_git/features/nutrition/presentation/pages/meal_page.dart';
+import 'package:test_git/features/nutrition/presentation/widgets/meal_section.dart';
 import 'package:test_git/features/nutrition/presentation/widgets/food_entry_tile.dart';
 import 'package:test_git/features/nutrition/presentation/providers/nutrition_providers.dart';
 
@@ -221,5 +223,82 @@ void main() {
     expect(requests, 1);
     expect(find.textContaining('(USDA)'), findsOneWidget);
     expect(find.text('เลือกอื่น (1)'), findsOneWidget);
+  });
+
+  testWidgets('แยกตามมื้อ บอกว่ามื้อนั้นขาดอะไร แล้วเพิ่มของที่แนะนำได้', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'user_profile':
+          '{"weightKg":70,"heightCm":175,"age":30,"sex":"male",'
+          '"activityLevel":null}',
+    });
+    final prefs = await SharedPreferences.getInstance();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+        child: const NutritionApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // เลือกมื้อกลางวัน แถบบอกว่ามื้อนี้ยังขาดอะไร
+    await tester.tap(find.text('เพิ่มวัตถุดิบ'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ChoiceChip, 'มื้อกลางวัน'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('มื้อกลางวันยังขาด: โปรตีน'), findsOneWidget);
+
+    // ข้าวอย่างเดียว คาร์บมาแต่โปรตีนขาด
+    await tester.enterText(find.byType(TextField).first, 'ข้าวสวย');
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ListTile, 'ข้าวสวย'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField), '250');
+    await tester.tap(find.text('เพิ่ม'));
+    await tester.pumpAndSettle();
+
+    final card = find.widgetWithText(MealCard, 'มื้อกลางวัน');
+    await tester.scrollUntilVisible(card, 200);
+    expect(
+      find.descendant(of: card, matching: find.textContaining('ขาดโปรตีน')),
+      findsOneWidget,
+    );
+
+    // หน้ามื้อ: แนะนำของโปรตีนสูง กดเพิ่มแล้วเข้ามื้อเดียวกัน
+    // เลื่อนจนสุด ให้หัวการ์ดพ้นปุ่มลอยด้านล่าง
+    await tester.drag(find.byType(ListView).first, const Offset(0, -1000));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(of: card, matching: find.text('มื้อกลางวัน')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(MealPage), findsOneWidget);
+    expect(find.textContaining(RegExp('ยังขาด.*โปรตีน')), findsOneWidget);
+    final add = find.text('+ เพิ่ม').first;
+    await tester.ensureVisible(add);
+    // ให้ปุ่มพ้นปุ่มลอยด้านล่าง
+    await tester.drag(
+      find.descendant(
+        of: find.byType(MealPage),
+        matching: find.byType(ListView),
+      ),
+      const Offset(0, -200),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+    final mealList = find
+        .descendant(
+          of: find.byType(MealPage),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      find.byType(FoodEntryTile).at(1),
+      200,
+      scrollable: mealList,
+    );
+    expect(find.byType(FoodEntryTile), findsNWidgets(2));
   });
 }
