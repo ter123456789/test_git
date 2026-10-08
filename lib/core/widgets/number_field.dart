@@ -29,11 +29,7 @@ class NumberField extends StatelessWidget {
     return TextFormField(
       controller: controller,
       autofocus: autofocus,
-      decoration: InputDecoration(
-        labelText: label,
-        suffixText: suffix,
-        border: const OutlineInputBorder(),
-      ),
+      decoration: InputDecoration(labelText: label, suffixText: suffix),
       keyboardType: TextInputType.numberWithOptions(decimal: allowDecimal),
       inputFormatters: [
         FilteringTextInputFormatter.allow(

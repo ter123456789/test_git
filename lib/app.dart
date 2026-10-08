@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/theme/app_theme.dart';
 import 'features/nutrition/presentation/pages/home_page.dart';
 import 'features/profile/presentation/pages/profile_form_page.dart';
 import 'features/profile/presentation/providers/profile_providers.dart';
@@ -12,9 +13,8 @@ class NutritionApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Prachaya Healthy Body',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
-      ),
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.light(),
       home: const _StartGate(),
     );
   }

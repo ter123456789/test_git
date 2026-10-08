@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../../core/providers/shared_preferences_provider.dart';
+import '../../../../core/utils/thai_date.dart';
+import '../../data/datasources/ingredient_matcher.dart';
 import '../../data/datasources/nutrition_local_data_source.dart';
 import '../../data/datasources/usda_remote_data_source.dart';
 import '../../data/repositories/food_log_repository_impl.dart';
@@ -62,13 +64,16 @@ class IngredientsNotifier extends AsyncNotifier<List<Ingredient>> {
   Future<List<Ingredient>> build() =>
       ref.watch(ingredientRepositoryProvider).getAll();
 
+  /// [nameEn] ใช้ให้ค้นด้วยภาษาอังกฤษเจอ เช่น ชื่อจาก USDA ที่ใช้เติมค่าโภชนาการ
   Future<Ingredient> addCustom({
     required String name,
     required Nutrients per100g,
+    String? nameEn,
   }) async {
     final ingredient = Ingredient(
       id: 'custom_${_newId()}',
       name: name,
+      nameEn: nameEn,
       per100g: per100g,
       source: IngredientSource.custom,
     );
@@ -85,6 +90,53 @@ class IngredientsNotifier extends AsyncNotifier<List<Ingredient>> {
   }
 }
 
+/// หาค่าโภชนาการจากชื่อ ใช้เติมค่าให้อัตโนมัติในหน้าเพิ่มวัตถุดิบใหม่
+///
+/// ค่าเป็น null ถ้ายังไม่ได้ค้น ไม่งั้นเป็นรายการที่ใกล้เคียง (ตัวแรกตรงที่สุด)
+final nutritionLookupProvider =
+    AsyncNotifierProvider.autoDispose<NutritionLookup, NutritionLookupResult?>(
+      NutritionLookup.new,
+    );
+
+typedef NutritionLookupResult = ({String query, List<Ingredient> candidates});
+
+class NutritionLookup extends AsyncNotifier<NutritionLookupResult?> {
+  /// จำนวนตัวเลือกสูงสุดที่แสดง
+  static const _maxCandidates = 8;
+
+  /// คำที่กำลังค้นอยู่ กันค้นซ้ำ เช่น กด Enter แล้วโฟกัสหลุดจากช่องชื่อทันที
+  String? _inFlight;
+
+  @override
+  Future<NutritionLookupResult?> build() async => null;
+
+  /// ค้นในเครื่องก่อน ถ้าไม่เจอค่อยค้นจาก USDA (ประหยัดโควตา)
+  Future<void> lookup(String name) async {
+    final query = name.trim();
+    if (query.isEmpty || query == _inFlight || query == state.value?.query) {
+      return;
+    }
+    _inFlight = query;
+    state = const AsyncLoading();
+    final result = await AsyncValue.guard(() async {
+      final all = await ref.read(ingredientsProvider.future);
+      final local = IngredientMatcher.search(all, query);
+      final candidates = local.isNotEmpty
+          ? local
+          : (await ref.read(ingredientRepositoryProvider).searchRemote(query))
+                .items;
+      return (
+        query: query,
+        candidates: candidates.take(_maxCandidates).toList(),
+      );
+    });
+    // ระหว่างรอ user อาจเปลี่ยนชื่อแล้วค้นใหม่ ผลเก่าทิ้งไป
+    if (_inFlight != query) return;
+    _inFlight = null;
+    state = result;
+  }
+}
+
 /// autoDispose เพื่อให้คำค้นหาล้างเองเมื่อออกจากหน้าเลือกวัตถุดิบ
 final ingredientQueryProvider =
     NotifierProvider.autoDispose<IngredientQuery, String>(IngredientQuery.new);
@@ -98,16 +150,10 @@ class IngredientQuery extends Notifier<String> {
 
 final filteredIngredientsProvider =
     Provider.autoDispose<AsyncValue<List<Ingredient>>>((ref) {
-      final query = ref.watch(ingredientQueryProvider).trim().toLowerCase();
+      final query = ref.watch(ingredientQueryProvider);
       return ref
           .watch(ingredientsProvider)
-          .whenData(
-            (items) => query.isEmpty
-                ? items
-                : items
-                      .where((i) => i.name.toLowerCase().contains(query))
-                      .toList(),
-          );
+          .whenData((items) => IngredientMatcher.search(items, query));
     });
 
 /// ผลค้นหาจาก USDA ค่าเป็น null ถ้ายังไม่ได้กดค้นหา
@@ -133,24 +179,29 @@ class UsdaSearch extends AsyncNotifier<RemoteSearchResult?> {
   void clear() => state = const AsyncData(null);
 }
 
-// ---------- บันทึกการกินวันนี้ ----------
+// ---------- บันทึกการกิน ----------
 
-final todayLogProvider =
-    AsyncNotifierProvider<TodayLogNotifier, List<FoodEntry>>(
-      TodayLogNotifier.new,
-    );
+/// ทุกรายการที่เคยบันทึก ใช้ทั้งหน้าวันนี้และหน้าประวัติ
+final foodLogProvider = AsyncNotifierProvider<FoodLogNotifier, List<FoodEntry>>(
+  FoodLogNotifier.new,
+);
 
-class TodayLogNotifier extends AsyncNotifier<List<FoodEntry>> {
+class FoodLogNotifier extends AsyncNotifier<List<FoodEntry>> {
   @override
   Future<List<FoodEntry>> build() =>
-      ref.watch(foodLogRepositoryProvider).getEntriesOn(DateTime.now());
+      ref.watch(foodLogRepositoryProvider).getAll();
 
-  Future<void> add(Ingredient ingredient, double grams) async {
+  /// เพิ่มรายการ ถ้าระบุ [day] (บันทึกย้อนหลัง) จะใช้เวลาปัจจุบันของวันนั้น
+  Future<void> add(Ingredient ingredient, double grams, {DateTime? day}) async {
+    final now = DateTime.now();
+    final eatenAt = day == null || day.isSameDay(now)
+        ? now
+        : DateTime(day.year, day.month, day.day, now.hour, now.minute);
     final entry = FoodEntry(
       id: _newId(),
       ingredient: ingredient,
       grams: grams,
-      eatenAt: DateTime.now(),
+      eatenAt: eatenAt,
     );
     await ref.read(foodLogRepositoryProvider).add(entry);
     state = AsyncData([...?state.value, entry]);
@@ -161,8 +212,3 @@ class TodayLogNotifier extends AsyncNotifier<List<FoodEntry>> {
     state = AsyncData([...?state.value?.where((e) => e.id != id)]);
   }
 }
-
-final todayTotalsProvider = Provider<Nutrients>((ref) {
-  final entries = ref.watch(todayLogProvider).value ?? const [];
-  return Nutrients.sum(entries.map((e) => e.nutrients));
-});

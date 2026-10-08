@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/utils/thai_text.dart';
 import '../../../../core/widgets/number_field.dart';
 import '../../domain/entities/ingredient.dart';
 import '../../domain/entities/remote_search_result.dart';
@@ -8,22 +9,30 @@ import '../providers/nutrition_providers.dart';
 import 'custom_ingredient_page.dart';
 
 class AddFoodPage extends ConsumerWidget {
-  const AddFoodPage({super.key});
+  const AddFoodPage({super.key, this.day});
 
+  /// วันที่จะบันทึก ถ้าเป็น null คือวันนี้
+  final DateTime? day;
+
+  /// [suggestedName] ใช้กับผลจาก USDA: ให้ตั้งชื่อไทยก่อนเก็บลงเครื่อง
   Future<void> _pick(
     BuildContext context,
     WidgetRef ref,
-    Ingredient ingredient,
-  ) async {
-    final grams = await showDialog<double>(
+    Ingredient ingredient, {
+    String? suggestedName,
+  }) async {
+    final result = await showDialog<_PickResult>(
       context: context,
-      builder: (_) => _GramsDialog(ingredient: ingredient),
+      builder: (_) =>
+          _GramsDialog(ingredient: ingredient, suggestedName: suggestedName),
     );
-    if (grams == null) return;
+    if (result == null) return;
+    final grams = result.grams;
+    if (result.name != null) ingredient = ingredient.withName(result.name!);
     if (ingredient.source == IngredientSource.usda) {
       await ref.read(ingredientsProvider.notifier).save(ingredient);
     }
-    await ref.read(todayLogProvider.notifier).add(ingredient, grams);
+    await ref.read(foodLogProvider.notifier).add(ingredient, grams, day: day);
     if (context.mounted) Navigator.of(context).pop();
   }
 
@@ -43,11 +52,17 @@ class AddFoodPage extends ConsumerWidget {
           TextButton.icon(
             icon: const Icon(Icons.add),
             label: const Text('วัตถุดิบใหม่'),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const CustomIngredientPage(),
-              ),
-            ),
+            onPressed: () async {
+              final logged = await Navigator.of(context).push<bool>(
+                MaterialPageRoute(
+                  builder: (_) => CustomIngredientPage(day: day),
+                ),
+              );
+              // บันทึกเข้ารายการแล้ว ไม่ต้องอยู่หน้าเลือกวัตถุดิบต่อ
+              if (logged == true && context.mounted) {
+                Navigator.of(context).pop();
+              }
+            },
           ),
         ],
       ),
@@ -59,7 +74,6 @@ class AddFoodPage extends ConsumerWidget {
               decoration: const InputDecoration(
                 hintText: 'ค้นหาวัตถุดิบ (ไทยหรืออังกฤษ)',
                 prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
               ),
               textInputAction: TextInputAction.search,
               onChanged: (text) {
@@ -149,7 +163,15 @@ class AddFoodPage extends ConsumerWidget {
                           for (final item in result.items)
                             _IngredientTile(
                               ingredient: item,
-                              onTap: () => _pick(context, ref, item),
+                              onTap: () => _pick(
+                                context,
+                                ref,
+                                item,
+                                // คำค้นภาษาไทยมักเป็นชื่อที่ user อยากเห็นอยู่แล้ว
+                                suggestedName: ThaiText.hasThai(query)
+                                    ? query
+                                    : '',
+                              ),
                             ),
                         ],
                 ),
@@ -187,9 +209,17 @@ class _IngredientTile extends StatelessWidget {
       IngredientSource.custom => 'เพิ่มเอง',
       IngredientSource.usda => 'USDA',
     };
+    final nameEn = ingredient.nameEn;
+    // วัตถุดิบจาก USDA ที่ตั้งชื่อไทยแล้ว แสดงชื่ออังกฤษเดิมกำกับไว้
+    final showEnglish =
+        ingredient.source == IngredientSource.usda &&
+        nameEn != null &&
+        nameEn != ingredient.name;
     return ListTile(
+      isThreeLine: showEnglish,
       title: Text(ingredient.name),
       subtitle: Text(
+        '${showEnglish ? '$nameEn\n' : ''}'
         '${n.kcal.round()} kcal / 100 ก. · '
         'P ${n.proteinG.toStringAsFixed(1)} '
         'C ${n.carbsG.toStringAsFixed(1)} '
@@ -201,10 +231,15 @@ class _IngredientTile extends StatelessWidget {
   }
 }
 
+typedef _PickResult = ({double grams, String? name});
+
 class _GramsDialog extends StatefulWidget {
-  const _GramsDialog({required this.ingredient});
+  const _GramsDialog({required this.ingredient, this.suggestedName});
 
   final Ingredient ingredient;
+
+  /// ถ้าไม่เป็น null จะมีช่องให้ตั้งชื่อ (ใช้กับผลจาก USDA)
+  final String? suggestedName;
 
   @override
   State<_GramsDialog> createState() => _GramsDialogState();
@@ -213,16 +248,23 @@ class _GramsDialog extends StatefulWidget {
 class _GramsDialogState extends State<_GramsDialog> {
   final _formKey = GlobalKey<FormState>();
   final _grams = TextEditingController(text: '100');
+  late final _name = TextEditingController(text: widget.suggestedName);
 
   @override
   void dispose() {
     _grams.dispose();
+    _name.dispose();
     super.dispose();
   }
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
-    Navigator.of(context).pop(double.parse(_grams.text));
+    final name = _name.text.trim();
+    Navigator.of(context).pop((
+      grams: double.parse(_grams.text),
+      // เว้นว่าง = ใช้ชื่อเดิมจาก USDA
+      name: widget.suggestedName == null || name.isEmpty ? null : name,
+    ));
   }
 
   @override
@@ -231,12 +273,28 @@ class _GramsDialogState extends State<_GramsDialog> {
       title: Text(widget.ingredient.name),
       content: Form(
         key: _formKey,
-        child: NumberField(
-          controller: _grams,
-          label: 'ปริมาณ',
-          suffix: 'กรัม',
-          max: 5000,
-          autofocus: true,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (widget.suggestedName != null) ...[
+              TextFormField(
+                controller: _name,
+                decoration: const InputDecoration(
+                  labelText: 'ชื่อภาษาไทย (ไม่บังคับ)',
+                  helperText: 'เว้นว่างไว้เพื่อใช้ชื่อจาก USDA',
+                ),
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 12),
+            ],
+            NumberField(
+              controller: _grams,
+              label: 'ปริมาณ',
+              suffix: 'กรัม',
+              max: 5000,
+              autofocus: widget.suggestedName == null,
+            ),
+          ],
         ),
       ),
       actions: [

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/widgets/number_field.dart';
+import '../../../backup/presentation/widgets/backup_actions.dart';
 import '../../domain/entities/user_profile.dart';
 import '../providers/profile_providers.dart';
 
@@ -139,7 +140,6 @@ class _ProfileFormPageState extends ConsumerState<ProfileFormPage> {
                 isExpanded: true,
                 decoration: const InputDecoration(
                   labelText: 'กิจกรรมประจำวัน (ไม่บังคับ)',
-                  border: OutlineInputBorder(),
                 ),
                 items: [
                   const DropdownMenuItem(value: null, child: Text('ไม่ระบุ')),
@@ -153,6 +153,19 @@ class _ProfileFormPageState extends ConsumerState<ProfileFormPage> {
                 onPressed: _saving ? null : _submit,
                 child: Text(isOnboarding ? 'เริ่มใช้งาน' : 'บันทึก'),
               ),
+              const SizedBox(height: 12),
+              if (isOnboarding)
+                // เปลี่ยนเครื่องใหม่: ดึงข้อมูลเดิมกลับมาแทนการกรอกใหม่
+                TextButton.icon(
+                  icon: const Icon(Icons.file_download_outlined),
+                  label: const Text('มีไฟล์สำรองอยู่แล้ว? นำเข้าข้อมูล'),
+                  onPressed: () => importBackup(context, ref),
+                )
+              else ...[
+                const SizedBox(height: 12),
+                // หลังนำเข้า ค่าในฟอร์มนี้เป็นของเก่า จึงปิดหน้ากลับไปหน้าหลัก
+                BackupCard(onImported: () => Navigator.of(context).maybePop()),
+              ],
             ],
           ),
         ),

@@ -9,6 +9,9 @@ class FoodLogRepositoryImpl implements FoodLogRepository {
   final NutritionLocalDataSource _local;
 
   @override
+  Future<List<FoodEntry>> getAll() async => _readAll();
+
+  @override
   Future<List<FoodEntry>> getEntriesOn(DateTime day) async => _readAll()
       .where(
         (e) =>

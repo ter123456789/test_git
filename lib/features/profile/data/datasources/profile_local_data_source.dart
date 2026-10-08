@@ -16,4 +16,6 @@ class ProfileLocalDataSource {
 
   Future<void> write(Map<String, dynamic> json) =>
       _prefs.setString(_key, jsonEncode(json));
+
+  Future<void> clear() => _prefs.remove(_key);
 }

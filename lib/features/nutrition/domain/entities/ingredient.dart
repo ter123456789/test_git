@@ -35,6 +35,14 @@ class Ingredient extends Equatable {
 
   Nutrients nutrientsFor(double grams) => per100g.scale(grams / 100);
 
+  Ingredient withName(String name) => Ingredient(
+    id: id,
+    name: name,
+    nameEn: nameEn,
+    per100g: per100g,
+    source: source,
+  );
+
   @override
   List<Object?> get props => [id, name, nameEn, per100g, source];
 }
