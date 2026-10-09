@@ -13,4 +13,10 @@ abstract interface class IngredientRepository {
   ///
   /// throw [IngredientSearchException] เมื่อค้นหาไม่สำเร็จ
   Future<RemoteSearchResult> searchRemote(String query);
+
+  /// หาวัตถุดิบจากบาร์โค้ด ดูของที่เก็บในเครื่องก่อน ไม่เจอค่อยถามแหล่งข้อมูลภายนอก
+  ///
+  /// คืน null ถ้าไม่พบสินค้า หรือสินค้านั้นไม่มีข้อมูลโภชนาการ
+  /// throw [IngredientSearchException] เมื่อค้นหาไม่สำเร็จ
+  Future<Ingredient?> lookupBarcode(String barcode);
 }

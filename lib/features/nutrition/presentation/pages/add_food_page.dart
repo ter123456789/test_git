@@ -13,6 +13,7 @@ import '../../domain/entities/remote_search_result.dart';
 import '../../domain/usecases/meal_balance.dart';
 import '../providers/nutrition_providers.dart';
 import 'custom_ingredient_page.dart';
+import 'scan_barcode_page.dart';
 
 class AddFoodPage extends ConsumerStatefulWidget {
   const AddFoodPage({super.key, this.day, this.meal});
@@ -32,6 +33,9 @@ class _AddFoodPageState extends ConsumerState<AddFoodPage> {
 
   DateTime? get day => widget.day;
 
+  /// กำลังหาสินค้าจากบาร์โค้ดที่สแกน
+  bool _lookingUp = false;
+
   /// [suggestedName] ใช้กับผลจาก USDA: ให้ตั้งชื่อไทยก่อนเก็บลงเครื่อง
   Future<void> _pick(Ingredient ingredient, {String? suggestedName}) async {
     final result = await showDialog<_PickResult>(
@@ -42,13 +46,69 @@ class _AddFoodPageState extends ConsumerState<AddFoodPage> {
     if (result == null) return;
     final grams = result.grams;
     if (result.name != null) ingredient = ingredient.withName(result.name!);
-    if (ingredient.source == IngredientSource.usda) {
+    if (ingredient.source
+        case IngredientSource.usda || IngredientSource.openFoodFacts) {
       await ref.read(ingredientsProvider.notifier).save(ingredient);
     }
     await ref
         .read(foodLogProvider.notifier)
         .add(ingredient, grams, day: day, meal: _meal);
     if (mounted) Navigator.of(context).pop();
+  }
+
+  /// [barcode] ใส่เมื่อสแกนแล้วไม่พบสินค้า ให้ครั้งหน้าสแกนเจอวัตถุดิบที่กรอกไว้
+  Future<void> _addCustom({String? barcode}) async {
+    final logged = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) =>
+            CustomIngredientPage(day: day, meal: _meal, barcode: barcode),
+      ),
+    );
+    // บันทึกเข้ารายการแล้ว ไม่ต้องอยู่หน้าเลือกวัตถุดิบต่อ
+    if (logged == true && mounted) Navigator.of(context).pop();
+  }
+
+  /// สแกนบาร์โค้ด เจอสินค้าก็ถามปริมาณเลย ไม่เจอก็เปิดหน้าเพิ่มวัตถุดิบใหม่
+  Future<void> _scan() async {
+    final code = await Navigator.of(
+      context,
+    ).push<String>(MaterialPageRoute(builder: (_) => const ScanBarcodePage()));
+    if (code == null || !mounted) return;
+
+    setState(() => _lookingUp = true);
+    final Ingredient? found;
+    try {
+      found = await ref.read(ingredientRepositoryProvider).lookupBarcode(code);
+    } on IngredientSearchException catch (e) {
+      _showMessage(switch (e) {
+        RateLimitedException() => 'ค้นหาถี่เกินไป รอสักครู่แล้วลองใหม่',
+        _ => 'เชื่อมต่อ Open Food Facts ไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่',
+      });
+      return;
+    } finally {
+      if (mounted) setState(() => _lookingUp = false);
+    }
+    if (!mounted) return;
+
+    if (found == null) {
+      _showMessage('ไม่พบข้อมูลโภชนาการของบาร์โค้ด $code กรอกค่าจากฉลากได้เลย');
+      await _addCustom(barcode: code);
+      return;
+    }
+    await _pick(
+      found,
+      // สินค้าส่วนใหญ่มีแต่ชื่ออังกฤษ ให้ตั้งชื่อไทยได้ก่อนเก็บลงเครื่อง
+      suggestedName:
+          found.source == IngredientSource.openFoodFacts &&
+              !ThaiText.hasThai(found.name)
+          ? ''
+          : null,
+    );
+  }
+
+  void _showMessage(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
   @override
@@ -64,22 +124,23 @@ class _AddFoodPageState extends ConsumerState<AddFoodPage> {
       appBar: AppBar(
         title: const Text('เลือกวัตถุดิบ'),
         actions: [
+          IconButton(
+            tooltip: 'สแกนบาร์โค้ด',
+            icon: const Icon(Icons.qr_code_scanner_rounded),
+            onPressed: _lookingUp ? null : _scan,
+          ),
           TextButton.icon(
             icon: const Icon(Icons.add),
             label: const Text('วัตถุดิบใหม่'),
-            onPressed: () async {
-              final logged = await Navigator.of(context).push<bool>(
-                MaterialPageRoute(
-                  builder: (_) => CustomIngredientPage(day: day, meal: _meal),
-                ),
-              );
-              // บันทึกเข้ารายการแล้ว ไม่ต้องอยู่หน้าเลือกวัตถุดิบต่อ
-              if (logged == true && context.mounted) {
-                Navigator.of(context).pop();
-              }
-            },
+            onPressed: _addCustom,
           ),
         ],
+        bottom: _lookingUp
+            ? const PreferredSize(
+                preferredSize: Size.fromHeight(4),
+                child: LinearProgressIndicator(),
+              )
+            : null,
       ),
       body: Column(
         children: [
@@ -289,11 +350,12 @@ class _IngredientTile extends StatelessWidget {
       IngredientSource.builtin => null,
       IngredientSource.custom => 'เพิ่มเอง',
       IngredientSource.usda => 'USDA',
+      IngredientSource.openFoodFacts => 'บาร์โค้ด',
     };
     final nameEn = ingredient.nameEn;
-    // วัตถุดิบจาก USDA ที่ตั้งชื่อไทยแล้ว แสดงชื่ออังกฤษเดิมกำกับไว้
+    // วัตถุดิบจาก USDA/บาร์โค้ดที่ตั้งชื่อไทยแล้ว แสดงชื่ออังกฤษเดิมกำกับไว้
     final showEnglish =
-        ingredient.source == IngredientSource.usda &&
+        ingredient.source != IngredientSource.builtin &&
         nameEn != null &&
         nameEn != ingredient.name;
     return ListTile(
@@ -319,7 +381,7 @@ class _GramsDialog extends StatefulWidget {
 
   final Ingredient ingredient;
 
-  /// ถ้าไม่เป็น null จะมีช่องให้ตั้งชื่อ (ใช้กับผลจาก USDA)
+  /// ถ้าไม่เป็น null จะมีช่องให้ตั้งชื่อ (ใช้กับผลจาก USDA และบาร์โค้ด)
   final String? suggestedName;
 
   @override
@@ -343,7 +405,7 @@ class _GramsDialogState extends State<_GramsDialog> {
     final name = _name.text.trim();
     Navigator.of(context).pop((
       grams: double.parse(_grams.text),
-      // เว้นว่าง = ใช้ชื่อเดิมจาก USDA
+      // เว้นว่าง = ใช้ชื่อเดิมจาก USDA หรือ Open Food Facts
       name: widget.suggestedName == null || name.isEmpty ? null : name,
     ));
   }
@@ -362,7 +424,7 @@ class _GramsDialogState extends State<_GramsDialog> {
                 controller: _name,
                 decoration: const InputDecoration(
                   labelText: 'ชื่อภาษาไทย (ไม่บังคับ)',
-                  helperText: 'เว้นว่างไว้เพื่อใช้ชื่อจาก USDA',
+                  helperText: 'เว้นว่างไว้เพื่อใช้ชื่อเดิม',
                 ),
                 textInputAction: TextInputAction.next,
               ),

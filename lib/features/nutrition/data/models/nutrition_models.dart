@@ -25,6 +25,7 @@ abstract final class NutritionModels {
     'nameEn': i.nameEn,
     'per100g': nutrientsToJson(i.per100g),
     'source': i.source.name,
+    if (i.barcode != null) 'barcode': i.barcode,
   };
 
   static Ingredient ingredientFromJson(Map<String, dynamic> json) => Ingredient(
@@ -33,6 +34,7 @@ abstract final class NutritionModels {
     nameEn: json['nameEn'] as String?,
     per100g: nutrientsFromJson(json['per100g'] as Map<String, dynamic>),
     source: _sourceFromJson(json),
+    barcode: json['barcode'] as String?,
   );
 
   /// ข้อมูลรุ่นแรกเก็บเป็น `isCustom` แทน `source`

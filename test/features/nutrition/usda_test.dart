@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test_git/features/nutrition/data/datasources/nutrition_local_data_source.dart';
+import 'package:test_git/features/nutrition/data/datasources/open_food_facts_remote_data_source.dart';
 import 'package:test_git/features/nutrition/data/datasources/thai_food_terms.dart';
 import 'package:test_git/features/nutrition/data/datasources/usda_remote_data_source.dart';
 import 'package:test_git/features/nutrition/data/models/usda_food_mapper.dart';
@@ -102,6 +103,7 @@ void main() {
         IngredientRepositoryImpl(
           local,
           UsdaRemoteDataSource(client: MockClient(handler), apiKey: 'KEY'),
+          OpenFoodFactsRemoteDataSource(client: MockClient(handler)),
         );
 
     test('แปลคำไทย ส่ง request ถูกต้อง และตัดรายการที่ไม่มีข้อมูล', () async {

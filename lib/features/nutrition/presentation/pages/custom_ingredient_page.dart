@@ -14,13 +14,16 @@ import '../providers/nutrition_providers.dart';
 ///
 /// pop กลับด้วย true เมื่อบันทึกเข้ารายการที่กินแล้ว
 class CustomIngredientPage extends ConsumerStatefulWidget {
-  const CustomIngredientPage({super.key, this.day, this.meal});
+  const CustomIngredientPage({super.key, this.day, this.meal, this.barcode});
 
   /// วันที่จะบันทึก ถ้าเป็น null คือวันนี้
   final DateTime? day;
 
   /// มื้อที่จะบันทึก ถ้าเป็น null จะเดาจากเวลา
   final Meal? meal;
+
+  /// บาร์โค้ดที่สแกนแล้วไม่พบข้อมูล เก็บไว้กับวัตถุดิบให้ครั้งหน้าสแกนเจอ
+  final String? barcode;
 
   @override
   ConsumerState<CustomIngredientPage> createState() =>
@@ -112,6 +115,7 @@ class _CustomIngredientPageState extends ConsumerState<CustomIngredientPage> {
           name: _name.text.trim(),
           per100g: _per100g!,
           nameEn: _filledFrom?.nameEn,
+          barcode: widget.barcode,
         );
     if (addToLog) {
       await ref

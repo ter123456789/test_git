@@ -43,5 +43,7 @@ abstract final class ThaiAvailability {
     IngredientSource.custom => true,
     // ของจาก USDA นับเฉพาะที่ user ตั้งชื่อไทยให้ ชื่ออังกฤษล้วนมักเป็นของนอก
     IngredientSource.usda => ThaiText.hasThai(i.name),
+    // สแกนจากของที่ซื้อมาจริง
+    IngredientSource.openFoodFacts => true,
   };
 }

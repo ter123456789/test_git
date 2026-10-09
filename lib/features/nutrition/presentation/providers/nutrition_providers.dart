@@ -6,6 +6,7 @@ import '../../../../core/utils/thai_date.dart';
 import '../../../profile/presentation/providers/profile_providers.dart';
 import '../../data/datasources/ingredient_matcher.dart';
 import '../../data/datasources/nutrition_local_data_source.dart';
+import '../../data/datasources/open_food_facts_remote_data_source.dart';
 import '../../data/datasources/usda_remote_data_source.dart';
 import '../../data/repositories/food_log_repository_impl.dart';
 import '../../data/repositories/ingredient_repository_impl.dart';
@@ -42,10 +43,15 @@ final _usdaRemoteDataSourceProvider = Provider(
   ),
 );
 
+final _openFoodFactsRemoteDataSourceProvider = Provider(
+  (ref) => OpenFoodFactsRemoteDataSource(client: ref.watch(httpClientProvider)),
+);
+
 final ingredientRepositoryProvider = Provider<IngredientRepository>(
   (ref) => IngredientRepositoryImpl(
     ref.watch(_nutritionLocalDataSourceProvider),
     ref.watch(_usdaRemoteDataSourceProvider),
+    ref.watch(_openFoodFactsRemoteDataSourceProvider),
   ),
 );
 
@@ -68,10 +74,12 @@ class IngredientsNotifier extends AsyncNotifier<List<Ingredient>> {
       ref.watch(ingredientRepositoryProvider).getAll();
 
   /// [nameEn] ใช้ให้ค้นด้วยภาษาอังกฤษเจอ เช่น ชื่อจาก USDA ที่ใช้เติมค่าโภชนาการ
+  /// [barcode] ใส่เมื่อสแกนแล้วไม่พบสินค้า ครั้งหน้าสแกนจะเจอวัตถุดิบนี้เลย
   Future<Ingredient> addCustom({
     required String name,
     required Nutrients per100g,
     String? nameEn,
+    String? barcode,
   }) async {
     final ingredient = Ingredient(
       id: 'custom_${_newId()}',
@@ -79,6 +87,7 @@ class IngredientsNotifier extends AsyncNotifier<List<Ingredient>> {
       nameEn: nameEn,
       per100g: per100g,
       source: IngredientSource.custom,
+      barcode: barcode,
     );
     await save(ingredient);
     return ingredient;

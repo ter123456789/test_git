@@ -4,6 +4,7 @@ import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test_git/features/nutrition/data/datasources/builtin_ingredients.dart';
 import 'package:test_git/features/nutrition/data/datasources/nutrition_local_data_source.dart';
+import 'package:test_git/features/nutrition/data/datasources/open_food_facts_remote_data_source.dart';
 import 'package:test_git/features/nutrition/data/datasources/usda_remote_data_source.dart';
 import 'package:test_git/features/nutrition/data/repositories/food_log_repository_impl.dart';
 import 'package:test_git/features/nutrition/data/repositories/ingredient_repository_impl.dart';
@@ -52,6 +53,9 @@ void main() {
       client: MockClient((_) async => http.Response('', 500)),
       apiKey: 'test',
     );
+    final offlineOpenFoodFacts = OpenFoodFactsRemoteDataSource(
+      client: MockClient((_) async => http.Response('', 500)),
+    );
 
     setUp(() async {
       SharedPreferences.setMockInitialValues({});
@@ -59,7 +63,11 @@ void main() {
     });
 
     test('วัตถุดิบที่เพิ่มเองถูกเก็บและรวมกับฐานข้อมูลในแอป', () async {
-      final repo = IngredientRepositoryImpl(local, offlineUsda);
+      final repo = IngredientRepositoryImpl(
+        local,
+        offlineUsda,
+        offlineOpenFoodFacts,
+      );
       const custom = Ingredient(
         id: 'custom_1',
         name: 'น้ำพริกหนุ่ม',
@@ -69,7 +77,11 @@ void main() {
 
       await repo.save(custom);
       await repo.save(custom); // id ซ้ำต้องไม่ถูกเก็บซ้ำ
-      final all = await IngredientRepositoryImpl(local, offlineUsda).getAll();
+      final all = await IngredientRepositoryImpl(
+        local,
+        offlineUsda,
+        offlineOpenFoodFacts,
+      ).getAll();
 
       expect(all.length, builtinIngredients.length + 1);
       expect(all.last, custom);
@@ -83,7 +95,11 @@ void main() {
       });
       local = NutritionLocalDataSource(await SharedPreferences.getInstance());
 
-      final all = await IngredientRepositoryImpl(local, offlineUsda).getAll();
+      final all = await IngredientRepositoryImpl(
+        local,
+        offlineUsda,
+        offlineOpenFoodFacts,
+      ).getAll();
       expect(all.last.source, IngredientSource.custom);
     });
 
